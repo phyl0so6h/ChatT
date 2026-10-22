@@ -5,9 +5,8 @@ import static com.sahak7an.chatt.utilities.Constants.KEY_IS_ONLINE;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER;
 
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.media.ThumbnailUtils;
 import android.os.Bundle;
-import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.view.Window;
 import android.view.WindowManager;
@@ -19,6 +18,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.sahak7an.chatt.R;
 import com.sahak7an.chatt.databinding.ActivityAboutUserBinding;
 import com.sahak7an.chatt.models.User;
+import com.sahak7an.chatt.utilities.ImageUtils;
 
 import java.util.Objects;
 
@@ -72,20 +72,13 @@ public class AboutUserActivity extends AppCompatActivity {
 
         activityAboutUserBinding.textUserName.setText(receiverUser.userName);
 
+        int[] displaySize = displaySize();
+
         activityAboutUserBinding.userImage.setImageBitmap(getResizedBitmap(
-                getReceiverUserImage(receiverUser.image),
-                displaySize()[0],
-                displaySize()[1] / 2
+                ImageUtils.decode(receiverUser.image),
+                displaySize[0],
+                displaySize[1] / 2
         ));
-
-    }
-
-    private Bitmap getReceiverUserImage(String encodedImage) {
-
-        byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
 
     }
 
@@ -136,7 +129,12 @@ public class AboutUserActivity extends AppCompatActivity {
 
     private Bitmap getResizedBitmap(Bitmap bitmap, int newWidth, int newHeight) {
 
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight + 100, false);
+        if (bitmap == null) {
+            return null;
+        }
+
+        // Center-crop instead of stretching, so the photo keeps its proportions.
+        return ThumbnailUtils.extractThumbnail(bitmap, newWidth, newHeight + 100);
 
     }
 

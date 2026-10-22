@@ -1,12 +1,7 @@
 package com.sahak7an.chatt.adapters;
 
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_HEIGHT;
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_WIDTH;
+import static com.sahak7an.chatt.utilities.Constants.PROFILE_IMAGE_SIZE;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
-import android.util.Base64;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -16,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.sahak7an.chatt.databinding.ItemContainerUserBinding;
 import com.sahak7an.chatt.listeners.UserListener;
 import com.sahak7an.chatt.models.User;
+import com.sahak7an.chatt.utilities.ImageUtils;
 
 import java.util.List;
 
@@ -46,8 +42,8 @@ public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.UserViewHold
             itemContainerUserBinding.textEmail.setText(user.email);
 
             itemContainerUserBinding.imageProfile.setImageBitmap(
-                    getResizedBitmap(getUserImage(user.image)
-                    ));
+                    ImageUtils.decodeScaled(user.image, PROFILE_IMAGE_SIZE)
+            );
 
             itemContainerUserBinding.getRoot().setOnClickListener(v -> userListener.onUserClicked(user));
 
@@ -80,32 +76,6 @@ public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.UserViewHold
     @Override
     public int getItemCount() {
         return userList.size();
-    }
-
-    private Bitmap getUserImage(String encodedImage) {
-
-        byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-    }
-
-    private Bitmap getResizedBitmap(Bitmap bitmap) {
-
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        float scaleWidth = ((float) IMAGE_HEIGHT) / width;
-        float scaleHeight = ((float) IMAGE_WIDTH) / height;
-
-        Matrix matrix = new Matrix();
-        matrix.postScale(scaleWidth, scaleHeight);
-
-        Bitmap resizedBitmap = Bitmap.createBitmap(
-                bitmap, 0, 0, width, height, matrix, false);
-        bitmap.recycle();
-
-        return resizedBitmap;
-
     }
 
 }

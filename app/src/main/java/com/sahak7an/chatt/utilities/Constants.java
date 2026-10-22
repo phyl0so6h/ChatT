@@ -6,9 +6,10 @@ public class Constants {
 
     public static final int MIN_PORT = 1000;
     public static final int MAX_PORT = 10000;
-    public static final int IMAGE_WIDTH = 1920;
+    public static final int PROFILE_IMAGE_SIZE = 512;
+    public static final int CHAT_IMAGE_SIZE = 1280;
+    public static final int IMAGE_QUALITY = 80;
     public static final String KEY_URI = "uri";
-    public static final int IMAGE_HEIGHT = 1080;
     public static final String KEY_USER = "user";
     public static final String KEY_PORT = "port";
     public static final int PICK_IMAGE_REQUEST = 1;

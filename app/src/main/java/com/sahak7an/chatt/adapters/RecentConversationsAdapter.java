@@ -1,13 +1,7 @@
 package com.sahak7an.chatt.adapters;
 
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_HEIGHT;
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_WIDTH;
+import static com.sahak7an.chatt.utilities.Constants.PROFILE_IMAGE_SIZE;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
-import android.util.Base64;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -19,6 +13,7 @@ import com.sahak7an.chatt.databinding.ItemContainerRecentConversionBinding;
 import com.sahak7an.chatt.listeners.ConversationListener;
 import com.sahak7an.chatt.models.ChatMessage;
 import com.sahak7an.chatt.models.User;
+import com.sahak7an.chatt.utilities.ImageUtils;
 
 import java.util.List;
 
@@ -46,16 +41,15 @@ public class RecentConversationsAdapter extends RecyclerView.Adapter<RecentConve
 
         void setData(ChatMessage chatMessage) {
 
-            Log.d("HELLO", String.valueOf(chatMessage.isImage));
-
-            if (chatMessage.isImage) {
+            if (Boolean.TRUE.equals(chatMessage.isImage)) {
                 recentConversionBinding.textRecentMessage.setText(R.string.file);
             } else {
                 recentConversionBinding.textRecentMessage.setText(chatMessage.message);
             }
 
-            recentConversionBinding.imageProfile.setImageBitmap(getResizedBitmap(
-                    getConversionImage(chatMessage.conversionImage)));
+            recentConversionBinding.imageProfile.setImageBitmap(
+                    ImageUtils.decodeScaled(chatMessage.conversionImage, PROFILE_IMAGE_SIZE)
+            );
 
             recentConversionBinding.textUserName.setText(chatMessage.conversionName);
             recentConversionBinding.getRoot().setOnClickListener(v -> {
@@ -69,32 +63,6 @@ public class RecentConversationsAdapter extends RecyclerView.Adapter<RecentConve
             });
 
         }
-
-    }
-
-    private Bitmap getConversionImage(String encodedImage) {
-
-        byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-    }
-
-    private Bitmap getResizedBitmap(Bitmap bitmap) {
-
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        float scaleWidth = ((float) IMAGE_HEIGHT) / width;
-        float scaleHeight = ((float) IMAGE_WIDTH) / height;
-
-        Matrix matrix = new Matrix();
-        matrix.postScale(scaleWidth, scaleHeight);
-
-        Bitmap resizedBitmap = Bitmap.createBitmap(
-                bitmap, 0, 0, width, height, matrix, false);
-        bitmap.recycle();
-
-        return resizedBitmap;
 
     }
 

@@ -36,14 +36,8 @@ import com.sahak7an.chatt.R;
 import com.sahak7an.chatt.databinding.ActivitySignInBinding;
 import com.sahak7an.chatt.utilities.PreferenceManager;
 
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.Enumeration;
 import java.util.Objects;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 
 public class SignInActivity extends AppCompatActivity {
 
@@ -204,7 +198,7 @@ public class SignInActivity extends AppCompatActivity {
 
         } else if (!Patterns.EMAIL_ADDRESS.matcher(activitySignInBinding.inputEmail.getText().toString()).matches()) {
 
-            showToast("Enter Email");
+            showToast("Enter valid Email");
             return false;
 
         } else if (activitySignInBinding.inputPassword.getText().toString().trim().isEmpty()) {
@@ -258,7 +252,7 @@ public class SignInActivity extends AppCompatActivity {
                                                 preferenceManager.putString(KEY_USER_NAME, documentSnapshot.getString(KEY_USER_NAME));
                                                 preferenceManager.putString(KEY_IMAGE, documentSnapshot.getString(KEY_IMAGE));
                                                 preferenceManager.putString(KEY_EMAIL, documentSnapshot.getString(KEY_EMAIL));
-                                                preferenceManager.putString(KEY_IP_ADDRESS, getDeviceIpAddress());
+                                                preferenceManager.putString(KEY_IP_ADDRESS, BaseActivity.getDeviceIpAddress());
 
                                                 preferenceManager.putBoolean(KEY_VERIFIED, true);
                                                 preferenceManager.putBoolean(KEY_IS_SIGNED_IN, true);
@@ -283,6 +277,11 @@ public class SignInActivity extends AppCompatActivity {
 
                                             }
                                         });
+
+                            } else {
+
+                                showToast("Verify your account. Check your email");
+                                firebaseUser.sendEmailVerification();
 
                             }
 
@@ -314,13 +313,8 @@ public class SignInActivity extends AppCompatActivity {
 
         if (firebaseUser != null) {
 
-            firebaseUser.reload();
-
-            try {
-
-                TimeUnit.MILLISECONDS.sleep(50);
-
-                firebaseUser.reload();
+            // reload() is asynchronous: wait for it instead of sleeping on the main thread.
+            firebaseUser.reload().addOnCompleteListener(task -> {
 
                 if (firebaseUser.isEmailVerified()) {
 
@@ -333,11 +327,7 @@ public class SignInActivity extends AppCompatActivity {
 
                 }
 
-            } catch (InterruptedException e) {
-
-                throw new RuntimeException(e);
-
-            }
+            });
 
         } else {
 
@@ -356,15 +346,8 @@ public class SignInActivity extends AppCompatActivity {
     private void autoLogIn() {
 
         if (firebaseUser != null) {
-            firebaseUser.reload();
 
-            try {
-
-                firebaseUser.reload();
-
-                TimeUnit.MILLISECONDS.sleep(50);
-
-                firebaseUser.reload();
+            firebaseUser.reload().addOnCompleteListener(task -> {
 
                 if (firebaseUser.isEmailVerified()) {
 
@@ -383,11 +366,7 @@ public class SignInActivity extends AppCompatActivity {
 
                 }
 
-            } catch (InterruptedException e) {
-
-                throw new RuntimeException(e);
-
-            }
+            });
 
         }
 
@@ -484,37 +463,6 @@ public class SignInActivity extends AppCompatActivity {
                 .build();
 
         biometricPrompt.authenticate(promptInfo);
-
-    }
-
-    public static String getDeviceIpAddress() {
-
-        try {
-
-            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
-
-                NetworkInterface networkInterface = en.nextElement();
-
-                for (Enumeration<InetAddress> enumIpAddress = networkInterface.getInetAddresses(); enumIpAddress.hasMoreElements();) {
-
-                    InetAddress inetAddress = enumIpAddress.nextElement();
-                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
-
-                        return inetAddress.getHostAddress();
-
-                    }
-
-                }
-
-            }
-
-        } catch (SocketException ex) {
-
-            ex.printStackTrace();
-
-        }
-
-        return null;
 
     }
 

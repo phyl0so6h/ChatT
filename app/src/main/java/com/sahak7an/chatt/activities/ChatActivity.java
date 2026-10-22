@@ -1,7 +1,7 @@
 package com.sahak7an.chatt.activities;
 
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_HEIGHT;
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_WIDTH;
+import static com.sahak7an.chatt.utilities.Constants.CHAT_IMAGE_SIZE;
+import static com.sahak7an.chatt.utilities.Constants.IMAGE_QUALITY;
 import static com.sahak7an.chatt.utilities.Constants.KEY_COLLECTION_CHAT;
 import static com.sahak7an.chatt.utilities.Constants.KEY_COLLECTION_CONVERSATIONS;
 import static com.sahak7an.chatt.utilities.Constants.KEY_COLLECTION_USERS;
@@ -23,6 +23,7 @@ import static com.sahak7an.chatt.utilities.Constants.KEY_TIMESTAMP;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER_ID;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER_NAME;
+import static com.sahak7an.chatt.utilities.Constants.PROFILE_IMAGE_SIZE;
 import static com.sahak7an.chatt.utilities.Constants.REMOTE_MSG_DATA;
 import static com.sahak7an.chatt.utilities.Constants.REMOTE_MSG_REGISTRATION_IDS;
 import static com.sahak7an.chatt.utilities.Constants.getRemoteMsgHeaders;
@@ -32,13 +33,11 @@ import android.content.ContentResolver;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Base64;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -68,14 +67,13 @@ import com.sahak7an.chatt.models.ChatMessage;
 import com.sahak7an.chatt.models.User;
 import com.sahak7an.chatt.network.ApiClient;
 import com.sahak7an.chatt.network.ApiService;
-import com.sahak7an.chatt.network.Client;
+import com.sahak7an.chatt.utilities.ImageUtils;
 import com.sahak7an.chatt.utilities.PreferenceManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
@@ -93,12 +91,12 @@ import retrofit2.Response;
 
 public class ChatActivity extends BaseActivity {
 
+    private static final int NOTIFICATION_IMAGE_SIZE = 64;
+
     private Uri imageUri;
     private int count = 0;
-    private Client client;
     private Bitmap bitmap;
     private User receiverUser;
-    private Thread clientThread;
     private Boolean flag = false;
     private String imageExtension;
     private ChatAdapter chatAdapter;
@@ -124,7 +122,12 @@ public class ChatActivity extends BaseActivity {
                             InputStream inputStream = getContentResolver().openInputStream(uri);
                             bitmap = BitmapFactory.decodeStream(inputStream);
 
-                            imageUri = result.getData().getData();
+                            if (bitmap == null) {
+                                showToast(getString(R.string.error));
+                                return;
+                            }
+
+                            imageUri = uri;
                             imageExtension = getFileExtension(imageUri);
                             uploadFile();
 
@@ -160,7 +163,8 @@ public class ChatActivity extends BaseActivity {
                     chatMessage.dateTime = getReadableDateTime(documentChange.getDocument().getDate(KEY_TIMESTAMP));
                     chatMessage.isImage = documentChange.getDocument().getBoolean(KEY_IS_IMAGE);
                     chatMessage.date = documentChange.getDocument().getDate(KEY_TIMESTAMP);
-                    chatMessage.count = Objects.requireNonNull(documentChange.getDocument().get(KEY_COUNT)).hashCode();
+                    Long messageCount = documentChange.getDocument().getLong(KEY_COUNT);
+                    chatMessage.count = messageCount != null ? messageCount.intValue() : 0;
                     chatMessages.add(chatMessage);
 
                 }
@@ -169,13 +173,11 @@ public class ChatActivity extends BaseActivity {
 
             chatMessages.sort(Comparator.comparing(obj -> obj.count));
 
-            if (count == 0) {
+            // View types depend on neighbouring messages (bubble grouping), so the whole list is rebound.
+            chatAdapter.notifyDataSetChanged();
 
-                chatAdapter.notifyDataSetChanged();
+            if (count != 0 && chatMessages.size() > count) {
 
-            } else {
-
-                chatAdapter.notifyItemRangeInserted(chatMessages.size(), chatMessages.size());
                 activityChatBinding.chatRecyclerView.smoothScrollToPosition(chatMessages.size() - 1);
 
             }
@@ -226,16 +228,16 @@ public class ChatActivity extends BaseActivity {
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
+    protected void onStart() {
+        super.onStart();
 
+        // Activity-scoped listener: removed automatically in onStop.
         listenAvailabilityOfReceiver();
 
     }
 
     private void loadReceiverDetails() {
 
-        listenAvailabilityOfReceiver();
         receiverUser = (User) getIntent().getSerializableExtra(KEY_USER);
 
     }
@@ -255,7 +257,7 @@ public class ChatActivity extends BaseActivity {
     }
 
     @SuppressLint("SetTextI18n")
-    private void listenAvailabilityOfReceiver() {
+    private void updateStatus() {
 
         if (flag) {
 
@@ -264,76 +266,78 @@ public class ChatActivity extends BaseActivity {
                     .getDrawable(getApplicationContext(),
                             R.drawable.background_sending_status));
 
+        } else if (isReceiverOnline) {
+
+            activityChatBinding.status.setBackground(AppCompatResources
+                    .getDrawable(getApplicationContext(),
+                            R.drawable.background_online_status));
+
+            activityChatBinding.textStatus.setText(getString(R.string.online));
+
         } else {
 
-            firebaseFirestore.collection(KEY_COLLECTION_USERS).document(preferenceManager.getString(KEY_RECEIVER_ID))
-                    .addSnapshotListener(ChatActivity.this, ((value, error) -> {
+            activityChatBinding.status.setBackground(AppCompatResources
+                    .getDrawable(getApplicationContext(),
+                            R.drawable.background_offline_status));
 
-                        if (error != null) {
-
-                            return;
-
-                        }
-
-                        if (value != null) {
-
-                            if (value.getBoolean(KEY_IS_ONLINE) != null) {
-
-                                isReceiverOnline = Objects.requireNonNull(
-                                        value.getBoolean(KEY_IS_ONLINE)
-                                );
-
-                            }
-
-                            if (isReceiverOnline) {
-
-                                activityChatBinding.status.setBackground(AppCompatResources
-                                        .getDrawable(getApplicationContext(),
-                                                R.drawable.background_online_status));
-
-                                activityChatBinding.textStatus.setText(getString(R.string.online));
-
-                            } else {
-
-                                activityChatBinding.status.setBackground(AppCompatResources
-                                        .getDrawable(getApplicationContext(),
-                                                R.drawable.background_offline_status));
-
-                                activityChatBinding.textStatus.setText(getString(R.string.offline));
-
-                            }
-
-                            receiverUser.token = value.getString(KEY_FCM_TOKEN);
-
-                            if (receiverUser.image == null) {
-
-                                receiverUser.image = value.getString(KEY_IMAGE);
-                                receiverUser.userName = value.getString(KEY_USER_NAME);
-                                receiverUser.email = value.getString(KEY_EMAIL);
-                                receiverUser.token = value.getString(KEY_FCM_TOKEN);
-                                receiverUser.id = value.getId();
-
-                                activityChatBinding.receiverImage.setImageBitmap(getResizedBitmap(getReceiverUserImage(
-                                        receiverUser.image
-                                )));
-
-                                activityChatBinding.textUserName.setText(receiverUser.userName);
-
-                            } else {
-
-                                activityChatBinding.receiverImage.setImageBitmap(getResizedBitmap(getReceiverUserImage(
-                                        preferenceManager.getString(KEY_RECEIVER_IMAGE)
-                                )));
-
-                                activityChatBinding.textUserName.setText(preferenceManager.getString(KEY_RECEIVER_USER_NAME));
-
-                            }
-
-                        }
-
-                    }));
+            activityChatBinding.textStatus.setText(getString(R.string.offline));
 
         }
+
+    }
+
+    private void listenAvailabilityOfReceiver() {
+
+        firebaseFirestore.collection(KEY_COLLECTION_USERS).document(preferenceManager.getString(KEY_RECEIVER_ID))
+                .addSnapshotListener(ChatActivity.this, ((value, error) -> {
+
+                    if (error != null) {
+
+                        return;
+
+                    }
+
+                    if (value != null) {
+
+                        if (value.getBoolean(KEY_IS_ONLINE) != null) {
+
+                            isReceiverOnline = Objects.requireNonNull(
+                                    value.getBoolean(KEY_IS_ONLINE)
+                            );
+
+                        }
+
+                        updateStatus();
+
+                        receiverUser.token = value.getString(KEY_FCM_TOKEN);
+
+                        if (receiverUser.image == null) {
+
+                            receiverUser.image = value.getString(KEY_IMAGE);
+                            receiverUser.userName = value.getString(KEY_USER_NAME);
+                            receiverUser.email = value.getString(KEY_EMAIL);
+                            receiverUser.token = value.getString(KEY_FCM_TOKEN);
+                            receiverUser.id = value.getId();
+
+                            activityChatBinding.receiverImage.setImageBitmap(
+                                    ImageUtils.decodeScaled(receiverUser.image, PROFILE_IMAGE_SIZE)
+                            );
+
+                            activityChatBinding.textUserName.setText(receiverUser.userName);
+
+                        } else {
+
+                            activityChatBinding.receiverImage.setImageBitmap(ImageUtils.decodeScaled(
+                                    preferenceManager.getString(KEY_RECEIVER_IMAGE), PROFILE_IMAGE_SIZE
+                            ));
+
+                            activityChatBinding.textUserName.setText(preferenceManager.getString(KEY_RECEIVER_USER_NAME));
+
+                        }
+
+                    }
+
+                }));
 
     }
 
@@ -388,7 +392,7 @@ public class ChatActivity extends BaseActivity {
         }
 
         flag = false;
-        listenAvailabilityOfReceiver();
+        updateStatus();
 
         if (!isReceiverOnline) {
 
@@ -401,8 +405,11 @@ public class ChatActivity extends BaseActivity {
                 data.put(KEY_USER_ID, preferenceManager.getString(KEY_USER_ID));
                 data.put(KEY_USER_NAME, preferenceManager.getString(KEY_USER_NAME));
                 data.put(KEY_FCM_TOKEN, preferenceManager.getString(KEY_FCM_TOKEN));
-                data.put(KEY_RECEIVER_IMAGE, encodedImage(getReceiverUserImage(preferenceManager.getString(KEY_IMAGE))));
-                data.put(KEY_MESSAGE, activityChatBinding.inputMessage.getText().toString().strip());
+                // FCM data payloads are limited to 4 KB, so only a tiny avatar thumbnail is sent.
+                data.put(KEY_RECEIVER_IMAGE, ImageUtils.encode(
+                        ImageUtils.decode(preferenceManager.getString(KEY_IMAGE)), NOTIFICATION_IMAGE_SIZE, 50
+                ));
+                data.put(KEY_MESSAGE, isImage ? getString(R.string.file) : messageText.strip());
 
                 JSONObject body = new JSONObject();
                 body.put(REMOTE_MSG_DATA, data);
@@ -513,13 +520,6 @@ public class ChatActivity extends BaseActivity {
 
     }
 
-    private Bitmap getReceiverUserImage(String encodedImage) {
-
-        byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-    }
-
     private void changeStatusBarColor() {
         Window window = this.getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
@@ -574,28 +574,9 @@ public class ChatActivity extends BaseActivity {
     private void showDialog() {
 
         FragmentManager fragmentManager = getSupportFragmentManager();
-        ImageProfileDialog imageProfileDialog = new ImageProfileDialog(getReceiverUserImage(receiverUser.image));
+        ImageProfileDialog imageProfileDialog = new ImageProfileDialog(ImageUtils.decode(receiverUser.image));
 
         imageProfileDialog.show(fragmentManager, "dialog");
-
-    }
-
-    private Bitmap getResizedBitmap(Bitmap bitmap) {
-
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        float scaleWidth = ((float) IMAGE_HEIGHT) / width;
-        float scaleHeight = ((float) IMAGE_WIDTH) / height;
-
-        Matrix matrix = new Matrix();
-        matrix.postScale(scaleWidth, scaleHeight);
-
-        Bitmap resizedBitmap = Bitmap.createBitmap(
-                bitmap, 0, 0, width, height, matrix, false);
-        bitmap.recycle();
-
-        return resizedBitmap;
 
     }
 
@@ -654,17 +635,6 @@ public class ChatActivity extends BaseActivity {
 
     }
 
-    private String encodedImage(Bitmap bitmap) {
-
-        Bitmap previewBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, false);
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        previewBitmap.compress(Bitmap.CompressFormat.WEBP, 95, byteArrayOutputStream);
-
-        byte[] bytes = byteArrayOutputStream.toByteArray();
-        return Base64.encodeToString(bytes, Base64.DEFAULT);
-
-    }
-
     private String getFileExtension(Uri uri) {
 
         ContentResolver contentResolver = getContentResolver();
@@ -673,27 +643,31 @@ public class ChatActivity extends BaseActivity {
 
     }
 
-    @SuppressLint("SetTextI18n")
     private void uploadFile() {
 
         flag = true;
+        updateStatus();
 
-        if (imageExtension != null) {
-
-            StorageReference fileReference = storageReference.child(
-                    preferenceManager.getString(KEY_USER_ID) + "_" +
-                    receiverUser.id + "/" + System.currentTimeMillis() + "." +
-                            imageExtension
-            );
-
-            fileReference.putFile(imageUri)
-                    .addOnSuccessListener(taskSnapshot -> {
-
-                        sendMessage(encodedImage(bitmap), true);
-
-                    });
-
+        if (imageExtension == null) {
+            imageExtension = "jpg";
         }
+
+        StorageReference fileReference = storageReference.child(
+                preferenceManager.getString(KEY_USER_ID) + "_" +
+                receiverUser.id + "/" + System.currentTimeMillis() + "." +
+                        imageExtension
+        );
+
+        fileReference.putFile(imageUri)
+                .addOnSuccessListener(taskSnapshot ->
+                        sendMessage(ImageUtils.encode(bitmap, CHAT_IMAGE_SIZE, IMAGE_QUALITY), true))
+                .addOnFailureListener(e -> {
+
+                    flag = false;
+                    updateStatus();
+                    showToast(e.getMessage());
+
+                });
 
     }
 

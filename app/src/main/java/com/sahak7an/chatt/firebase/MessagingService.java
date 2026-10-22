@@ -16,11 +16,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Build;
-import android.provider.Settings;
-import android.util.Base64;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -33,6 +29,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import com.sahak7an.chatt.R;
 import com.sahak7an.chatt.activities.ChatActivity;
 import com.sahak7an.chatt.models.User;
+import com.sahak7an.chatt.utilities.ImageUtils;
 import com.sahak7an.chatt.utilities.PreferenceManager;
 
 import java.util.Random;
@@ -81,18 +78,17 @@ public class MessagingService extends FirebaseMessagingService {
         }
 
         Intent intent = new Intent(this, ChatActivity.class);
-        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        intent.addCategory(Intent.CATEGORY_DEFAULT);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.putExtra(KEY_USER, user);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this, notificationId, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId);
 
         builder.setSmallIcon(R.drawable.ic_chat);
         builder.setContentTitle(user.userName);
         builder.setContentText(message.getData().get(KEY_MESSAGE));
-        builder.setLargeIcon(getReceiverUserImage(message.getData().get(KEY_RECEIVER_IMAGE)));
+        builder.setLargeIcon(ImageUtils.decode(message.getData().get(KEY_RECEIVER_IMAGE)));
         builder.setPriority(NotificationCompat.PRIORITY_HIGH);
         builder.setContentIntent(pendingIntent);
         builder.setAutoCancel(true);
@@ -107,13 +103,6 @@ public class MessagingService extends FirebaseMessagingService {
         }
 
         notificationManagerCompat.notify(notificationId, builder.build());
-
-    }
-
-    private Bitmap getReceiverUserImage(String encodedImage) {
-
-        byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
 
     }
 

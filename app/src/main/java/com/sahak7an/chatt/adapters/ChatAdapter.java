@@ -1,8 +1,5 @@
 package com.sahak7an.chatt.adapters;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.util.Base64;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -22,6 +19,7 @@ import com.sahak7an.chatt.databinding.ItemContainerSentMessageBinding;
 import com.sahak7an.chatt.databinding.ItemContainerSentMessageLastBinding;
 import com.sahak7an.chatt.databinding.ItemContainerSentMessageRoundBinding;
 import com.sahak7an.chatt.models.ChatMessage;
+import com.sahak7an.chatt.utilities.ImageUtils;
 
 import java.util.List;
 
@@ -42,6 +40,8 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
     public static final int VIEW_TYPE_RECEIVER_ROUND = 10;
     public static final int VIEW_TYPE_RECEIVER_IMAGE_LAST = 11;
     public static final int VIEW_TYPE_RECEIVER_IMAGE_ROUND = 12;
+
+    private static final int CHAT_IMAGE_PREVIEW_SIZE = 700;
 
     public ChatAdapter(String senderId, List<ChatMessage> chatMessages) {
 
@@ -120,16 +120,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
         void setData(ChatMessage chatMessage) {
 
-            sentImageBinding.imageInfo.setImageBitmap(getResizedBitmap(chatMessage.message));
-
-        }
-
-        private Bitmap getResizedBitmap(String encodedImage) {
-
-            byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-            return Bitmap.createScaledBitmap(bitmap, 250 * 2, 350 * 2, false);
+            sentImageBinding.imageInfo.setImageBitmap(ImageUtils.decodeScaled(chatMessage.message, CHAT_IMAGE_PREVIEW_SIZE));
 
         }
 
@@ -148,17 +139,8 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
         void setData(ChatMessage chatMessage) {
 
-            sentImageLastBinding.imageInfo.setImageBitmap(getResizedBitmap(chatMessage.message));
+            sentImageLastBinding.imageInfo.setImageBitmap(ImageUtils.decodeScaled(chatMessage.message, CHAT_IMAGE_PREVIEW_SIZE));
             sentImageLastBinding.textDateTime.setText(chatMessage.dateTime);
-
-        }
-
-        private Bitmap getResizedBitmap(String encodedImage) {
-
-            byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-            return Bitmap.createScaledBitmap(bitmap, 250 * 2, 350 * 2, false);
 
         }
 
@@ -177,16 +159,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
         void setData(ChatMessage chatMessage) {
 
-            sentImageRoundBinding.imageInfo.setImageBitmap(getResizedBitmap(chatMessage.message));
-
-        }
-
-        private Bitmap getResizedBitmap(String encodedImage) {
-
-            byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-            return Bitmap.createScaledBitmap(bitmap, 250 * 2, 350 * 2, false);
+            sentImageRoundBinding.imageInfo.setImageBitmap(ImageUtils.decodeScaled(chatMessage.message, CHAT_IMAGE_PREVIEW_SIZE));
 
         }
 
@@ -263,16 +236,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
         void setData(ChatMessage chatMessage) {
 
-            receiverImageBinding.imageInfo.setImageBitmap(getResizedBitmap(chatMessage.message));
-
-        }
-
-        private Bitmap getResizedBitmap(String encodedImage) {
-
-            byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-            return Bitmap.createScaledBitmap(bitmap, 250 * 2, 350 * 2, false);
+            receiverImageBinding.imageInfo.setImageBitmap(ImageUtils.decodeScaled(chatMessage.message, CHAT_IMAGE_PREVIEW_SIZE));
 
         }
 
@@ -291,17 +255,8 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
         void setData(ChatMessage chatMessage) {
 
-            receiverImageLastBinding.imageInfo.setImageBitmap(getResizedBitmap(chatMessage.message));
+            receiverImageLastBinding.imageInfo.setImageBitmap(ImageUtils.decodeScaled(chatMessage.message, CHAT_IMAGE_PREVIEW_SIZE));
             receiverImageLastBinding.textDateTime.setText(chatMessage.dateTime);
-
-        }
-
-        private Bitmap getResizedBitmap(String encodedImage) {
-
-            byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-            return Bitmap.createScaledBitmap(bitmap, 250 * 2, 350 * 2, false);
 
         }
 
@@ -320,16 +275,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
         void setData(ChatMessage chatMessage) {
 
-            receiverImageRoundBinding.imageInfo.setImageBitmap(getResizedBitmap(chatMessage.message));
-
-        }
-
-        private Bitmap getResizedBitmap(String encodedImage) {
-
-            byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-            return Bitmap.createScaledBitmap(bitmap, 250 * 2, 350 * 2, false);
+            receiverImageRoundBinding.imageInfo.setImageBitmap(ImageUtils.decodeScaled(chatMessage.message, CHAT_IMAGE_PREVIEW_SIZE));
 
         }
 
@@ -535,7 +481,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 if (position == chatMessages.size() - 1) {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_SENT_IMAGE_LAST;
 
@@ -547,7 +493,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else if (chatMessages.get(position + 1).senderId.equals(senderId)) {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_SENT_IMAGE;
 
@@ -559,7 +505,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_SENT_IMAGE_LAST;
 
@@ -573,7 +519,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
             } else if(position == chatMessages.size() - 1) {
 
-                if (chatMessages.get(position).isImage) {
+                if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                     return VIEW_TYPE_SENT_IMAGE_LAST;
 
@@ -589,7 +535,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                     if (chatMessages.get(position + 1).senderId.equals(senderId)) {
 
-                        if (chatMessages.get(position).isImage) {
+                        if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                             return VIEW_TYPE_SENT_IMAGE;
 
@@ -601,7 +547,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                     } else {
 
-                        if (chatMessages.get(position).isImage) {
+                        if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                             return VIEW_TYPE_SENT_IMAGE_LAST;
 
@@ -615,7 +561,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else if (chatMessages.get(position + 1).senderId.equals(senderId)) {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_SENT_IMAGE_ROUND;
 
@@ -627,7 +573,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_SENT_IMAGE_LAST;
 
@@ -647,7 +593,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 if (position == chatMessages.size() - 1) {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_RECEIVER_IMAGE_LAST;
 
@@ -659,7 +605,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else if (!chatMessages.get(position + 1).senderId.equals(senderId)) {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_RECEIVER_IMAGE;
 
@@ -671,7 +617,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_RECEIVER_IMAGE_LAST;
 
@@ -685,7 +631,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
             } else if(position == chatMessages.size() - 1) {
 
-                if (chatMessages.get(position).isImage) {
+                if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                     return VIEW_TYPE_RECEIVER_IMAGE_LAST;
 
@@ -701,7 +647,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                     if (!chatMessages.get(position + 1).senderId.equals(senderId)) {
 
-                        if (chatMessages.get(position).isImage) {
+                        if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                             return VIEW_TYPE_RECEIVER_IMAGE;
 
@@ -713,7 +659,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                     } else {
 
-                        if (chatMessages.get(position).isImage) {
+                        if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                             return VIEW_TYPE_RECEIVER_IMAGE_LAST;
 
@@ -727,7 +673,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else if (!chatMessages.get(position + 1).senderId.equals(senderId)) {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_RECEIVER_IMAGE_ROUND;
 
@@ -739,7 +685,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
 
                 } else {
 
-                    if (chatMessages.get(position).isImage) {
+                    if (Boolean.TRUE.equals(chatMessages.get(position).isImage)) {
 
                         return VIEW_TYPE_RECEIVER_IMAGE_LAST;
 

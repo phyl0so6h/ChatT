@@ -5,7 +5,6 @@ import android.app.Dialog;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -21,6 +20,7 @@ import androidx.fragment.app.DialogFragment;
 
 import com.makeramen.roundedimageview.RoundedImageView;
 import com.sahak7an.chatt.R;
+import com.sahak7an.chatt.utilities.ImageUtils;
 
 import java.util.Objects;
 
@@ -50,7 +50,7 @@ public class ImageProfileDialog extends DialogFragment implements View.OnClickLi
                 getContext(), R.anim.fade_in
         ));
 
-        roundedImageView.setImageBitmap(getResizedBitmap(userImage));
+        roundedImageView.setImageBitmap(ImageUtils.scaleToFit(userImage, 1440));
 
         return view;
 
@@ -91,25 +91,6 @@ public class ImageProfileDialog extends DialogFragment implements View.OnClickLi
     public void onClick(View view) {
 
         dismiss();
-
-    }
-
-    private Bitmap getResizedBitmap(Bitmap bitmap) {
-
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        float scaleWidth = ((float) 1440) / width;
-        float scaleHeight = ((float) 2560) / height;
-
-        Matrix matrix = new Matrix();
-        matrix.postScale(scaleWidth, scaleHeight);
-
-        Bitmap resizedBitmap = Bitmap.createBitmap(
-                bitmap, 0, 0, width, height, matrix, false);
-        bitmap.recycle();
-
-        return resizedBitmap;
 
     }
 

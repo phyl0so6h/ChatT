@@ -1,12 +1,12 @@
 package com.sahak7an.chatt.activities;
 
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_HEIGHT;
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_WIDTH;
+import static com.sahak7an.chatt.utilities.Constants.IMAGE_QUALITY;
 import static com.sahak7an.chatt.utilities.Constants.KEY_COLLECTION_USERS;
 import static com.sahak7an.chatt.utilities.Constants.KEY_EMAIL;
 import static com.sahak7an.chatt.utilities.Constants.KEY_IMAGE;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER_ID;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER_NAME;
+import static com.sahak7an.chatt.utilities.Constants.PROFILE_IMAGE_SIZE;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -16,7 +16,6 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Base64;
 import android.util.Patterns;
 import android.view.View;
 import android.view.Window;
@@ -32,12 +31,11 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.sahak7an.chatt.R;
 import com.sahak7an.chatt.databinding.ActivitySignUpBinding;
+import com.sahak7an.chatt.utilities.ImageUtils;
 import com.sahak7an.chatt.utilities.PreferenceManager;
 
-import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -65,9 +63,14 @@ public class SignUpActivity extends AppCompatActivity {
                             InputStream inputStream = getContentResolver().openInputStream(imageUri);
                             Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
 
+                            if (bitmap == null) {
+                                showToast("Unable to load this image");
+                                return;
+                            }
+
                             activitySignUpBinding.imageProfile.setImageBitmap(bitmap);
                             activitySignUpBinding.textAddImage.setVisibility(View.GONE);
-                            encodedImage = encodedImage(bitmap);
+                            encodedImage = ImageUtils.encode(bitmap, PROFILE_IMAGE_SIZE, IMAGE_QUALITY);
 
                         } catch (FileNotFoundException e) {
 
@@ -364,24 +367,22 @@ public class SignUpActivity extends AppCompatActivity {
         firebaseAuth = FirebaseAuth.getInstance();
         firebaseFirestore = FirebaseFirestore.getInstance();
 
+        // Query only the requested username instead of downloading every user profile.
         firebaseFirestore.collection(KEY_COLLECTION_USERS)
+                        .whereEqualTo(KEY_USER_NAME, activitySignUpBinding.inputUserName.getText().toString().trim())
+                        .limit(1)
                         .get()
                         .addOnCompleteListener(v -> {
 
-                           boolean flag = true;
+                           if (!v.isSuccessful() || v.getResult() == null) {
 
-                           for (QueryDocumentSnapshot queryDocumentSnapshot: v.getResult()) {
-
-                               if (activitySignUpBinding.inputUserName.getText().toString().trim()
-                                       .equals(queryDocumentSnapshot.getString(KEY_USER_NAME))) {
-
-                                   flag = false;
-
-                               }
+                               showToast("Sign up isn't successful");
+                               loading(false);
+                               return;
 
                            }
 
-                           if (flag) {
+                           if (v.getResult().isEmpty()) {
 
                                firebaseAuth.createUserWithEmailAndPassword(activitySignUpBinding.inputEmail.getText().toString(),
                                                activitySignUpBinding.inputPassword.getText().toString())
@@ -414,8 +415,10 @@ public class SignUpActivity extends AppCompatActivity {
                                                        })
                                                        .addOnFailureListener(e -> {
 
+                                                           // Roll back the just-created auth account so the email can be reused.
                                                            showToast(e.getMessage());
                                                            Objects.requireNonNull(firebaseAuth.getCurrentUser()).delete();
+                                                           loading(false);
 
                                                        });
 
@@ -515,17 +518,6 @@ public class SignUpActivity extends AppCompatActivity {
             activitySignUpBinding.progressBar.setVisibility(View.INVISIBLE);
 
         }
-
-    }
-
-    private String encodedImage(Bitmap bitmap) {
-
-        Bitmap previewBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, false);
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        previewBitmap.compress(Bitmap.CompressFormat.WEBP, 95, byteArrayOutputStream);
-
-        byte[] bytes = byteArrayOutputStream.toByteArray();
-        return Base64.encodeToString(bytes, Base64.DEFAULT);
 
     }
 

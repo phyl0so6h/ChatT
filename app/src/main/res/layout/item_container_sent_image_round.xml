@@ -10,6 +10,7 @@
 
     <com.makeramen.roundedimageview.RoundedImageView
         android:id="@+id/imageInfo"
+        android:scaleType="centerCrop"
         android:layout_width="250dp"
         android:layout_height="350dp"
         android:padding="2dp"

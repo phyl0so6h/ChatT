@@ -1,7 +1,5 @@
 package com.sahak7an.chatt.activities;
 
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_HEIGHT;
-import static com.sahak7an.chatt.utilities.Constants.IMAGE_WIDTH;
 import static com.sahak7an.chatt.utilities.Constants.KEY_COLLECTION_CONVERSATIONS;
 import static com.sahak7an.chatt.utilities.Constants.KEY_COLLECTION_USERS;
 import static com.sahak7an.chatt.utilities.Constants.KEY_FCM_TOKEN;
@@ -18,14 +16,11 @@ import static com.sahak7an.chatt.utilities.Constants.KEY_TIMESTAMP;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER_ID;
 import static com.sahak7an.chatt.utilities.Constants.KEY_USER_NAME;
+import static com.sahak7an.chatt.utilities.Constants.PROFILE_IMAGE_SIZE;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
 import android.os.Bundle;
-import android.util.Base64;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -35,12 +30,12 @@ import android.widget.Toast;
 import androidx.fragment.app.FragmentManager;
 
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.sahak7an.chatt.R;
@@ -49,9 +44,11 @@ import com.sahak7an.chatt.databinding.ActivityMainBinding;
 import com.sahak7an.chatt.listeners.ConversationListener;
 import com.sahak7an.chatt.models.ChatMessage;
 import com.sahak7an.chatt.models.User;
+import com.sahak7an.chatt.utilities.ImageUtils;
 import com.sahak7an.chatt.utilities.PreferenceManager;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
@@ -59,12 +56,12 @@ import java.util.Objects;
 public class MainActivity extends BaseActivity implements ConversationListener {
 
     private int count = 0;
-    private FirebaseUser firebaseUser;
     private List<ChatMessage> conversations;
     private PreferenceManager preferenceManager;
     private FirebaseFirestore firebaseFirestore;
     private ActivityMainBinding activityMainBinding;
     private RecentConversationsAdapter conversationsAdapter;
+    private final List<ListenerRegistration> conversationListeners = new ArrayList<>();
 
     @SuppressLint("NotifyDataSetChanged")
     private final EventListener<QuerySnapshot> eventListener = (value, error) -> {
@@ -80,7 +77,6 @@ public class MainActivity extends BaseActivity implements ConversationListener {
             for (DocumentChange documentChange: value.getDocumentChanges()) {
 
                 if (documentChange.getType() == DocumentChange.Type.ADDED) {
-                    conversations.clear();
 
                     String senderId = documentChange.getDocument().getString(KEY_SENDER_ID);
                     String receiverId = documentChange.getDocument().getString(KEY_RECEIVER_ID);
@@ -119,6 +115,7 @@ public class MainActivity extends BaseActivity implements ConversationListener {
 
                             conversations.get(item).message = Objects.requireNonNull(documentChange.getDocument().getString(KEY_LAST_MESSAGE)).strip();
                             conversations.get(item).date = documentChange.getDocument().getDate(KEY_TIMESTAMP);
+                            conversations.get(item).isImage = documentChange.getDocument().getBoolean(KEY_IS_IMAGE);
                             break;
 
                         }
@@ -129,7 +126,10 @@ public class MainActivity extends BaseActivity implements ConversationListener {
 
             }
 
-            conversations.sort((obj1, obj2) -> obj2.date.compareTo(obj1.date));
+            conversations.sort(Comparator.comparing(
+                    (ChatMessage chatMessage) -> chatMessage.date,
+                    Comparator.nullsLast(Comparator.reverseOrder())
+            ));
             conversationsAdapter.notifyDataSetChanged();
             activityMainBinding.conversationsRecyclerView.smoothScrollToPosition(0);
             activityMainBinding.conversationsRecyclerView.setVisibility(View.VISIBLE);
@@ -143,7 +143,6 @@ public class MainActivity extends BaseActivity implements ConversationListener {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
         preferenceManager = new PreferenceManager(getApplicationContext());
         activityMainBinding = ActivityMainBinding.inflate(getLayoutInflater());
         changeStatusBarColor();
@@ -156,13 +155,19 @@ public class MainActivity extends BaseActivity implements ConversationListener {
         getToken();
 
         setListeners();
+        listenConversations();
 
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        listenConversations();
+    protected void onDestroy() {
+        super.onDestroy();
+
+        for (ListenerRegistration listenerRegistration: conversationListeners) {
+            listenerRegistration.remove();
+        }
+
+        conversationListeners.clear();
     }
 
     private void init() {
@@ -214,13 +219,13 @@ public class MainActivity extends BaseActivity implements ConversationListener {
 
     private void listenConversations() {
 
-        firebaseFirestore.collection(KEY_COLLECTION_CONVERSATIONS)
+        conversationListeners.add(firebaseFirestore.collection(KEY_COLLECTION_CONVERSATIONS)
                 .whereEqualTo(KEY_SENDER_ID, preferenceManager.getString(KEY_USER_ID))
-                .addSnapshotListener(eventListener);
+                .addSnapshotListener(eventListener));
 
-        firebaseFirestore.collection(KEY_COLLECTION_CONVERSATIONS)
+        conversationListeners.add(firebaseFirestore.collection(KEY_COLLECTION_CONVERSATIONS)
                 .whereEqualTo(KEY_RECEIVER_ID, preferenceManager.getString(KEY_USER_ID))
-                .addSnapshotListener(eventListener);
+                .addSnapshotListener(eventListener));
 
     }
 
@@ -228,10 +233,9 @@ public class MainActivity extends BaseActivity implements ConversationListener {
 
         activityMainBinding.textName.setText(preferenceManager.getString(KEY_USER_NAME));
 
-        byte[] bytes = Base64.decode(preferenceManager.getString(KEY_IMAGE), Base64.DEFAULT);
-        Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-        activityMainBinding.imageProfile.setImageBitmap(getResizedBitmap(bitmap));
+        activityMainBinding.imageProfile.setImageBitmap(
+                ImageUtils.decodeScaled(preferenceManager.getString(KEY_IMAGE), PROFILE_IMAGE_SIZE)
+        );
 
     }
 
@@ -245,24 +249,7 @@ public class MainActivity extends BaseActivity implements ConversationListener {
 
         FirebaseMessaging.getInstance().getToken()
                 .addOnSuccessListener(this::updateToken)
-                .addOnFailureListener(v -> {
-
-                    if (firebaseUser != null) {
-
-                        firebaseUser.delete();
-
-                    }
-
-                    preferenceManager.clear();
-
-                    showToast("Please Sign in again\n " +
-                            "Your account will be deleted\n" +
-                            "    Or connection Error    ");
-
-                    startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-                    finish();
-
-                });
+                .addOnFailureListener(e -> showToast(getString(R.string.check_connection)));
 
     }
 
@@ -277,24 +264,7 @@ public class MainActivity extends BaseActivity implements ConversationListener {
                 );
 
         documentReference.update(KEY_FCM_TOKEN, token)
-                .addOnFailureListener(e -> {
-
-                    if (firebaseUser != null) {
-
-                        firebaseUser.delete();
-
-                    }
-
-                    preferenceManager.clear();
-
-                    showToast("Please Sign in again\n " +
-                            "Your account will be deleted\n" +
-                            "    Or connection Error    ");
-
-                    startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-                    finish();
-
-                });
+                .addOnFailureListener(e -> showToast(getString(R.string.check_connection)));
 
     }
 
@@ -311,24 +281,11 @@ public class MainActivity extends BaseActivity implements ConversationListener {
         HashMap<String, Object> updates = new HashMap<>();
         updates.put(KEY_FCM_TOKEN, FieldValue.delete());
 
+        // Sign out locally even if the token cleanup fails (e.g. no connection).
         documentReference.update(updates)
-                .addOnSuccessListener(unused -> {
+                .addOnCompleteListener(task -> {
 
-                    preferenceManager.clear();
-                    startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-                    finish();
-
-                })
-                .addOnFailureListener(e -> {
-
-                    showToast("Unable to sign out");
-
-                    if (firebaseUser != null) {
-
-                        firebaseUser.delete();
-
-                    }
-
+                    FirebaseAuth.getInstance().signOut();
                     preferenceManager.clear();
 
                     startActivity(new Intent(getApplicationContext(), SignInActivity.class));
@@ -359,23 +316,6 @@ public class MainActivity extends BaseActivity implements ConversationListener {
         startActivity(intent);
 
     }
-    private Bitmap getResizedBitmap(Bitmap bitmap) {
 
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-
-        float scaleWidth = ((float) IMAGE_HEIGHT) / width;
-        float scaleHeight = ((float) IMAGE_WIDTH) / height;
-
-        Matrix matrix = new Matrix();
-        matrix.postScale(scaleWidth, scaleHeight);
-
-        Bitmap resizedBitmap = Bitmap.createBitmap(
-                bitmap, 0, 0, width, height, matrix, false);
-        bitmap.recycle();
-
-        return resizedBitmap;
-
-    }
 
 }
